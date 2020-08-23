@@ -2,6 +2,10 @@ import torch
 import torch.nn as nn
 from model_pack.encoder_decoder import Encoder, Decoder
 
+"""
+Input shape for Transformer block = (num_sample, seq_len)  
+Out shape of Transformer block =  (num_sample, seq_len, target_vocab_size)
+"""
 
 class Transformer(nn.Module):
     def __init__(self,
