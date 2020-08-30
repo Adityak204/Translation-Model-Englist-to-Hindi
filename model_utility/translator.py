@@ -2,6 +2,7 @@ import torch
 import math
 import copy
 
+
 """
 # Data Processing : tokenization, batching, padding, splits, data load
 from torchtext.data import Field, TabularDataset, BucketIterator
@@ -64,8 +65,8 @@ def beam_search(sentence, model, src_field, src_tokenizer, trg_field, trg_vcb_sz
     sentence_tok.append(src_field.eos_token)
 
     # Converting text to indices
-    src_tok = torch.tensor([src_field.vocab.stoi[token] for token in sentence_tok], dtype=torch.long)
-    trg_tok = torch.tensor([trg_field.vocab.stoi[trg_field.init_token]], dtype=torch.long)
+    src_tok = torch.tensor([src_field.vocab.stoi[token] for token in sentence_tok], dtype=torch.long).unsqueeze(0)
+    trg_tok = torch.tensor([trg_field.vocab.stoi[trg_field.init_token]], dtype=torch.long).unsqueeze(0)
 
     # Setting 'eos' flag for target sentence
     eos = trg_field.vocab.stoi[trg_field.eos_token]
@@ -79,7 +80,7 @@ def beam_search(sentence, model, src_field, src_tokenizer, trg_field, trg_vcb_sz
         if ts == 0:
             with torch.no_grad():
                 out = model(src_tok, trg_tok)  # [1, trg_vcb_sz]
-            topk = torch.topk(torch.log(out), dim=-1, k=k)
+            topk = torch.topk(torch.log(torch.softmax(out, dim=-1)), dim=-1, k=k)
             seq_id = torch.empty(size=(k, ts + 2), dtype=torch.long)
             seq_id[:, :ts + 1] = trg_tok
             seq_id[:, ts + 1] = topk.indices
@@ -92,16 +93,16 @@ def beam_search(sentence, model, src_field, src_tokenizer, trg_field, trg_vcb_sz
                 store_seq_id = copy.deepcopy(seq_id)
                 store_seq_prob = copy.deepcopy(seq_prob)
         else:
+            src_tok = src_tok.squeeze()
             src = src_tok.expand(size=(store_seq_id.shape[-2], len(src_tok)))
             with torch.no_grad():
                 out = model(src, store_seq_id)
-            out = torch.log(out[:, -1, :])  # [store_seq_id.shape[-2], trg_vcb_sz]
+            out = torch.log(torch.softmax(out[:, -1, :], dim=-1))  # [k, trg_vcb_sz]
             all_comb = (store_seq_prob.view(-1, 1) + out).view(-1)
             all_comb_idx = torch.tensor([(x, y) for x in range(store_seq_id.shape[-2]) for y in range(trg_vcb_sz)])
             topk = torch.topk(all_comb, dim=-1, k=k)
             top_seq_id = all_comb_idx[topk.indices.squeeze()]
             top_seq_prob = topk.values
-            # seq_id = torch.empty(size=(store_seq_id.shape[-2], ts + 2), dtype=torch.long)
             seq_id = torch.empty(size=(k, ts + 2), dtype=torch.long)
             seq_id[:, :ts + 1] = torch.tensor([store_seq_id[i.tolist()].tolist() for i, y in top_seq_id])
             seq_id[:, ts + 1] = torch.tensor([y.tolist() for i, y in top_seq_id])
@@ -116,5 +117,8 @@ def beam_search(sentence, model, src_field, src_tokenizer, trg_field, trg_vcb_sz
         if len(trans_store) == k:
             break
 
-    best_translation = trans_store[max(trans_store)]
+    if len(trans_store) == 0:
+        best_translation = store_seq_id[0]
+    else:
+        best_translation = trans_store[max(trans_store)]
     return " ".join([trg_field.vocab.itos[w] for w in best_translation])
