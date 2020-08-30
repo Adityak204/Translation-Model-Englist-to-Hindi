@@ -115,7 +115,7 @@ spacy_eng = spacy.load("en_core_web_sm")
 
 # Defining Tokenizer
 def tokenize_eng(text):
-    return [tok.text for tok in spacy_eng.tokenizer(text)]
+    return [tok.text.lower() for tok in spacy_eng.tokenizer(text)]
 
 
 def tokenize_hindi(text):
