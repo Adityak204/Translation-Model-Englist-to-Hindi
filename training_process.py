@@ -51,28 +51,27 @@ train_dt, val_dt = TabularDataset.splits(path='./', train='train.csv', validatio
 english_txt.build_vocab(train_dt, max_size=10000, min_freq=2)
 hindi_txt.build_vocab(train_dt, max_size=10000, min_freq=2)
 
-# Defining Iterator
-train_iter = BucketIterator(train_dt, batch_size=20, sort_key=lambda x: len(x.eng_text), shuffle=True)
-val_iter = BucketIterator(val_dt, batch_size=20, sort_key=lambda x: len(x.eng_text), shuffle=True)
-
-
 # Training & Evaluation
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 save_model = True
 
 # Training hyperparameters
-num_epochs = 10000
+num_epochs = 1
 learning_rate = 3e-4
 batch_size = 32
+
+# Defining Iterator
+train_iter = BucketIterator(train_dt, batch_size=batch_size, sort_key=lambda x: len(x.eng_text), shuffle=True)
+val_iter = BucketIterator(val_dt, batch_size=batch_size, sort_key=lambda x: len(x.eng_text), shuffle=True)
 
 # Model hyper-parameters
 src_vocab_size = len(english_txt.vocab)
 trg_vocab_size = len(hindi_txt.vocab)
 embedding_size = 512
 num_heads = 8
-num_layers = 3
+num_layers = 6
 dropout = 0.10
-max_len = 100
+max_len = 1000
 forward_expansion = 4
 src_pad_idx = english_txt.vocab.stoi["<pad>"]
 trg_pad_idx = 0
@@ -102,14 +101,15 @@ for epoch in range(num_epochs):
     loop = tqdm(enumerate(train_iter), total=len(train_iter))
     for batch_idx, batch in loop:
         # Get input and targets and move to GPU if available
-        inp_data = batch.eng_text.to(device)
-        target = batch.hindi_text.to(device)
+        # Switching axis because bucket-iterator gives output of size(seq_len,bs)
+        inp_data = batch.eng_text.permute(-1, -2).to(device)
+        target = batch.hindi_text.permute(-1, -2).to(device)
 
         # Forward prop
-        output = model(inp_data, target[:-1, :])
+        output = model(inp_data, target[:, :-1])
 
         optimizer.zero_grad()
-        loss = criterion(output.squeeze(), target.view(-1))
+        loss = criterion(output.reshape(-1, trg_vocab_size), target[:, :-1].reshape(-1))
         losses.append(loss.item())
 
         # Back prop
@@ -130,12 +130,12 @@ for epoch in range(num_epochs):
     val_losses = []
     with torch.no_grad:
         for val_batch_idx, val_batch in enumerate(val_iter):
-            val_inp_data = val_batch.eng_text.to(device)
-            val_target = val_batch.hindi_text.to(device)
+            val_inp_data = val_batch.eng_text.permute(-1, -2).unsqueeze(0).to(device)
+            val_target = val_batch.hindi_text.permute(-1, -2).unsqueeze(0).to(device)
             val_output = model(val_inp_data, val_target[:-1, :])
             val_loss = criterion(val_output.squeeze(), val_output.view(-1))
             val_losses.append(val_loss.item())
         val_mean_loss = sum(val_losses)/len(val_losses)
 
-    print(f"Mean Training loss = {train_mean_loss} & Mean Validation loss = {val_mean_loss}")
+    print(f"Epoch [{epoch}/{num_epochs}]: train_loss= {train_mean_loss}; val_loss= {val_mean_loss}")
 
