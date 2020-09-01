@@ -1,5 +1,4 @@
 import torch
-import math
 import copy
 
 
@@ -53,10 +52,12 @@ trg_field = hindi_txt
 trg_vcb_sz = 10000
 k = 5
 
+tr = beam_search(sentence=sentence, model=model, src_field=english_txt, src_tokenizer=tokenize_eng, 
+                 trg_field=hindi_txt, trg_vcb_sz=10000, k=5)
 """
 
 
-def beam_search(sentence, model, src_field, src_tokenizer, trg_field, trg_vcb_sz, k, max_ts=50):
+def beam_search(sentence, model, src_field, src_tokenizer, trg_field, trg_vcb_sz, k, max_ts=50, device="cpu"):
     # Tokenize the input sentence
     sentence_tok = src_tokenizer(sentence)
 
@@ -65,8 +66,8 @@ def beam_search(sentence, model, src_field, src_tokenizer, trg_field, trg_vcb_sz
     sentence_tok.append(src_field.eos_token)
 
     # Converting text to indices
-    src_tok = torch.tensor([src_field.vocab.stoi[token] for token in sentence_tok], dtype=torch.long).unsqueeze(0)
-    trg_tok = torch.tensor([trg_field.vocab.stoi[trg_field.init_token]], dtype=torch.long).unsqueeze(0)
+    src_tok = torch.tensor([src_field.vocab.stoi[token] for token in sentence_tok], dtype=torch.long).unsqueeze(0).to(device)
+    trg_tok = torch.tensor([trg_field.vocab.stoi[trg_field.init_token]], dtype=torch.long).unsqueeze(0).to(device)
 
     # Setting 'eos' flag for target sentence
     eos = trg_field.vocab.stoi[trg_field.eos_token]
@@ -87,14 +88,14 @@ def beam_search(sentence, model, src_field, src_tokenizer, trg_field, trg_vcb_sz
             seq_prob = topk.values
             if eos in seq_id[:, ts + 1]:
                 trans_store[seq_prob[:, seq_id[:, ts + 1] == eos].squeeze()] = seq_id[seq_id[:, ts + 1] == eos, :].squeeze()
-                store_seq_id = copy.deepcopy(seq_id[seq_id[:, ts + 1] != eos, :])
-                store_seq_prob = copy.deepcopy(seq_prob[:, seq_id[:, ts + 1] != eos].squeeze())
+                store_seq_id = copy.deepcopy(seq_id[seq_id[:, ts + 1] != eos, :]).to(device)
+                store_seq_prob = copy.deepcopy(seq_prob[:, seq_id[:, ts + 1] != eos].squeeze()).to(device)
             else:
-                store_seq_id = copy.deepcopy(seq_id)
-                store_seq_prob = copy.deepcopy(seq_prob)
+                store_seq_id = copy.deepcopy(seq_id).to(device)
+                store_seq_prob = copy.deepcopy(seq_prob).to(device)
         else:
             src_tok = src_tok.squeeze()
-            src = src_tok.expand(size=(store_seq_id.shape[-2], len(src_tok)))
+            src = src_tok.expand(size=(store_seq_id.shape[-2], len(src_tok))).to(device)
             with torch.no_grad():
                 out = model(src, store_seq_id)
             out = torch.log(torch.softmax(out[:, -1, :], dim=-1))  # [k, trg_vcb_sz]
@@ -109,11 +110,11 @@ def beam_search(sentence, model, src_field, src_tokenizer, trg_field, trg_vcb_sz
             seq_prob = top_seq_prob
             if eos in seq_id[:, ts + 1]:
                 trans_store[seq_prob[seq_id[:, ts + 1] == eos].squeeze()] = seq_id[seq_id[:, ts + 1] == eos, :].squeeze()
-                store_seq_id = copy.deepcopy(seq_id[seq_id[:, ts + 1] != eos, :])
-                store_seq_prob = copy.deepcopy(seq_prob[seq_id[:, ts + 1] != eos].squeeze())
+                store_seq_id = copy.deepcopy(seq_id[seq_id[:, ts + 1] != eos, :]).to(device)
+                store_seq_prob = copy.deepcopy(seq_prob[seq_id[:, ts + 1] != eos].squeeze()).to(device)
             else:
-                store_seq_id = copy.deepcopy(seq_id)
-                store_seq_prob = copy.deepcopy(seq_prob)
+                store_seq_id = copy.deepcopy(seq_id).to(device)
+                store_seq_prob = copy.deepcopy(seq_prob).to(device)
         if len(trans_store) == k:
             break
 
@@ -121,4 +122,4 @@ def beam_search(sentence, model, src_field, src_tokenizer, trg_field, trg_vcb_sz
         best_translation = store_seq_id[0]
     else:
         best_translation = trans_store[max(trans_store)]
-    return " ".join([trg_field.vocab.itos[w] for w in best_translation])
+    return " ".join([trg_field.vocab.itos[w] for w in best_translation[1:]])
