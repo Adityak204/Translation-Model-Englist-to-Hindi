@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
+import numpy as np
 
 # Packages for data generator & preparation
 from torchtext.data import Field, TabularDataset, BucketIterator
@@ -23,7 +24,7 @@ common.set_resources_path(INDIC_NLP_RESOURCES)
 # Packages for model building & inferences
 from model_pack.transformer import Transformer
 from model_utility.translator import beam_search
-
+from model_utility.utils import save_checkpoint
 
 # Data Prep
 # Settings for handling english text
@@ -94,6 +95,7 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, pa
 
 pad_idx = hindi_txt.vocab.stoi["<pad>"]
 criterion = nn.CrossEntropyLoss(ignore_index=pad_idx)
+loss_tracker = []
 
 for epoch in range(num_epochs):
     model.train()
@@ -136,6 +138,17 @@ for epoch in range(num_epochs):
             val_loss = criterion(val_output.squeeze(), val_output.view(-1))
             val_losses.append(val_loss.item())
         val_mean_loss = sum(val_losses)/len(val_losses)
+
+    loss_tracker.append(val_mean_loss)
+    min_loss = np.min(loss_tracker)
+
+    if epoch % 10 == 0:
+        if save_model:
+            checkpoint = {
+                "state_dict": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+            }
+            save_checkpoint(checkpoint)
 
     print(f"Epoch [{epoch}/{num_epochs}]: train_loss= {train_mean_loss}; val_loss= {val_mean_loss}")
 
