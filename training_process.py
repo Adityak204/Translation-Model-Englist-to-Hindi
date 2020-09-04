@@ -140,10 +140,9 @@ for epoch in range(num_epochs):
         val_mean_loss = sum(val_losses)/len(val_losses)
 
     loss_tracker.append(val_mean_loss)
-    min_loss = np.min(loss_tracker)
 
     if epoch % 10 == 0:
-        if save_model:
+        if save_model and val_mean_loss == np.min(loss_tracker):
             checkpoint = {
                 "state_dict": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
