@@ -13,6 +13,8 @@ from indicnlp import common
 from indicnlp.tokenize import indic_tokenize
 
 # Settings for handling devnagri text
+# INDIC_NLP_LIB_HOME = r"/indic_nlp_library"
+# INDIC_NLP_RESOURCES = r"/indic_nlp_resources"
 INDIC_NLP_LIB_HOME = r"/Translation Model/indic_nlp_library"
 INDIC_NLP_RESOURCES = r"/Translation Model/indic_nlp_resources"
 # Add library to Python path
@@ -70,7 +72,7 @@ src_vocab_size = len(english_txt.vocab)
 trg_vocab_size = len(hindi_txt.vocab)
 embedding_size = 512
 num_heads = 8
-num_layers = 6
+num_layers = 3
 dropout = 0.10
 max_len = 1000
 forward_expansion = 4
@@ -88,7 +90,7 @@ model = Transformer(src_vocab_size=src_vocab_size,
                     heads=num_heads,
                     dropout=dropout,
                     device=device,
-                    max_len=max_len)
+                    max_len=max_len).to(device)
 
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=10, verbose=True)
@@ -111,7 +113,7 @@ for epoch in range(num_epochs):
         output = model(inp_data, target[:, :-1])
 
         optimizer.zero_grad()
-        loss = criterion(output.reshape(-1, trg_vocab_size), target[:, :-1].reshape(-1))
+        loss = criterion(output.reshape(-1, trg_vocab_size), target[:, 1:].reshape(-1))
         losses.append(loss.item())
 
         # Back prop
