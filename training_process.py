@@ -48,7 +48,7 @@ hindi_txt = Field(tokenize=tokenize_hindi, init_token="<sos>", eos_token="<eos>"
 
 # Defining Tabular Dataset
 data_fields = [('eng_text', english_txt), ('hindi_text', hindi_txt)]
-train_dt, val_dt = TabularDataset.splits(path='./', train='train.csv', validation='val.csv', format='csv', fields=data_fields)
+train_dt, val_dt = TabularDataset.splits(path='./', train='train_sm.csv', validation='val.csv', format='csv', fields=data_fields)
 
 # Building word vocab
 english_txt.build_vocab(train_dt, max_size=10000, min_freq=2)
@@ -74,7 +74,7 @@ embedding_size = 512
 num_heads = 8
 num_layers = 3
 dropout = 0.10
-max_len = 1000
+max_len = 10000
 forward_expansion = 4
 src_pad_idx = english_txt.vocab.stoi["<pad>"]
 trg_pad_idx = 0
@@ -132,12 +132,12 @@ for epoch in range(num_epochs):
 
     model.eval()
     val_losses = []
-    with torch.no_grad:
-        for val_batch_idx, val_batch in enumerate(val_iter):
-            val_inp_data = val_batch.eng_text.permute(-1, -2).unsqueeze(0).to(device)
-            val_target = val_batch.hindi_text.permute(-1, -2).unsqueeze(0).to(device)
-            val_output = model(val_inp_data, val_target[:-1, :])
-            val_loss = criterion(val_output.squeeze(), val_output.view(-1))
+    with torch.no_grad():
+        for val_batch_idx, val_batch in tqdm(enumerate(val_iter), total=len(val_iter)):
+            val_inp_data = val_batch.eng_text.permute(-1, -2).to(device)
+            val_target = val_batch.hindi_text.permute(-1, -2).to(device)
+            val_output = model(val_inp_data, val_target[:, :-1])
+            val_loss = criterion(val_output.reshape(-1, trg_vocab_size), val_target[:, 1:].reshape(-1))
             val_losses.append(val_loss.item())
         val_mean_loss = sum(val_losses)/len(val_losses)
 
