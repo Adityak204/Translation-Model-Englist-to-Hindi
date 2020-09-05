@@ -59,9 +59,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 save_model = True
 
 # Training hyperparameters
-num_epochs = 1
+num_epochs = 10
 learning_rate = 3e-4
-batch_size = 32
+batch_size = 256
 
 # Defining Iterator
 train_iter = BucketIterator(train_dt, batch_size=batch_size, sort_key=lambda x: len(x.eng_text), shuffle=True)
@@ -117,7 +117,7 @@ for epoch in range(num_epochs):
         losses.append(loss.item())
 
         # Checking GPU uses
-        if device == "cuda":
+        if device.type == "cuda":
             total_mem = torch.cuda.get_device_properties(0).total_memory/1024/1024
             allocated_mem = torch.cuda.memory_allocated(0)/1024/1024
             reserved_mem = torch.cuda.memory_reserved(0)/1024/1024
@@ -136,7 +136,7 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         # Update progress bar
-        loop.set_postfix(loss=loss.item(), total_gpu_mem=total_mem, gpu_allocated_mem=allocated_mem, gpu_reserved_mem=reserved_mem)
+        loop.set_postfix(loss=loss.item(), total_gpu_mem=str(total_mem), gpu_allocated_mem=str(allocated_mem), gpu_reserved_mem=str(reserved_mem))
 
     train_mean_loss = sum(losses) / len(losses)
     scheduler.step(train_mean_loss)
@@ -154,7 +154,7 @@ for epoch in range(num_epochs):
 
     loss_tracker.append(val_mean_loss)
 
-    if epoch % 10 == 0:
+    if epoch % 1 == 0:
         if save_model and val_mean_loss == np.min(loss_tracker):
             checkpoint = {
                 "state_dict": model.state_dict(),
@@ -162,5 +162,5 @@ for epoch in range(num_epochs):
             }
             save_checkpoint(checkpoint)
 
-    print(f"Epoch [{epoch}/{num_epochs}]: train_loss= {train_mean_loss}; val_loss= {val_mean_loss}")
+    print(f"Epoch [{epoch + 1}/{num_epochs}]: train_loss= {train_mean_loss}; val_loss= {val_mean_loss}")
 
