@@ -48,7 +48,7 @@ hindi_txt = Field(tokenize=tokenize_hindi, init_token="<sos>", eos_token="<eos>"
 
 # Defining Tabular Dataset
 data_fields = [('eng_text', english_txt), ('hindi_text', hindi_txt)]
-train_dt, val_dt = TabularDataset.splits(path='./', train='train_sm.csv', validation='val.csv', format='csv', fields=data_fields)
+train_dt, val_dt = TabularDataset.splits(path='./', train='train_sm.csv', validation='val_sm.csv', format='csv', fields=data_fields)
 
 # Building word vocab
 english_txt.build_vocab(train_dt, max_size=10000, min_freq=2)
@@ -116,8 +116,19 @@ for epoch in range(num_epochs):
         loss = criterion(output.reshape(-1, trg_vocab_size), target[:, 1:].reshape(-1))
         losses.append(loss.item())
 
+        # Checking GPU uses
+        if device == "cuda":
+            total_mem = torch.cuda.get_device_properties(0).total_memory/1024/1024
+            allocated_mem = torch.cuda.memory_allocated(0)/1024/1024
+            reserved_mem = torch.cuda.memory_reserved(0)/1024/1024
+        else:
+            total_mem = 0
+            allocated_mem = 0
+            reserved_mem = 0
+
         # Back prop
         loss.backward()
+
         # Clipping exploding gradients
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1)
 
@@ -125,7 +136,7 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         # Update progress bar
-        loop.set_postfix(loss=loss.item())
+        loop.set_postfix(loss=loss.item(), total_gpu_mem=total_mem, gpu_allocated_mem=allocated_mem, gpu_reserved_mem=reserved_mem)
 
     train_mean_loss = sum(losses) / len(losses)
     scheduler.step(train_mean_loss)
