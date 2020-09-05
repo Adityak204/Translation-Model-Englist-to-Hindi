@@ -54,7 +54,21 @@ for sent in tqdm(filtered_hindi_text):
 clean_data = pd.DataFrame({"eng_text": clean_eng_text, "hindi_text": clean_hindi_text})
 
 
+# Filtering data based on sentence length
+clean_data["eng_len"] = clean_data.eng_text.str.count(" ")
+clean_data["hindi_len"] = clean_data.hindi_text.str.count(" ")
+small_len_data = clean_data.query('eng_len < 50 & hindi_len < 50')
+
+
 # Train-Val split
-train_set, val_set = train_test_split(clean_data, test_size=0.1)
+# Full set
+train_set, val_set = train_test_split(small_len_data.loc[:, ["eng_text", "hindi_text"]], test_size=0.1)
 train_set.to_csv("train.csv", index=False)
 val_set.to_csv("val.csv", index=False)
+
+# Small set
+small_data = small_len_data.loc[:, ["eng_text", "hindi_text"]].sample(n=150000)
+train_set_sm, val_set_sm = train_test_split(small_data, test_size=0.3)
+train_set_sm.to_csv("train_sm.csv", index=False)
+val_set_sm.to_csv("val_sm.csv", index=False)
+
