@@ -1,7 +1,7 @@
 # Translation Model (Englist-to-Hindi)
 ## Description
-This repository contains the implementation of English to Hindi Language Translation using Transformer model in PyTorch.
-Transformer Model created here is build from scratch.
+This repository contains the implementation of English to Hindi Language Translation using the Transformer model in PyTorch.
+Transformer Model created here is built from scratch.
 
 The Model has been trained on the English-Hindi parallel corpus provided by IIT Bombay.
 http://www.cfilt.iitb.ac.in/iitb_parallel/
