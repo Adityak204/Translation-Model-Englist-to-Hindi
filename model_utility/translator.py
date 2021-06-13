@@ -85,11 +85,12 @@ def beam_search(sentence, model, src_field, src_tokenizer, trg_field, trg_vcb_sz
             seq_id = torch.empty(size=(k, ts + 2), dtype=torch.long)
             seq_id[:, :ts + 1] = trg_tok
             seq_id[:, ts + 1] = topk.indices
-            seq_prob = topk.values
+            seq_prob = topk.values.squeeze()
+            # print(seq_prob.shape)
             if eos in seq_id[:, ts + 1]:
-                trans_store[seq_prob[:, seq_id[:, ts + 1] == eos].squeeze()] = seq_id[seq_id[:, ts + 1] == eos, :].squeeze()
+                trans_store[seq_prob[seq_id[:, ts + 1] == eos].squeeze()] = seq_id[seq_id[:, ts + 1] == eos, :].squeeze()
                 store_seq_id = copy.deepcopy(seq_id[seq_id[:, ts + 1] != eos, :]).to(device)
-                store_seq_prob = copy.deepcopy(seq_prob[:, seq_id[:, ts + 1] != eos].squeeze()).to(device)
+                store_seq_prob = copy.deepcopy(seq_prob[seq_id[:, ts + 1] != eos].squeeze()).to(device)
             else:
                 store_seq_id = copy.deepcopy(seq_id).to(device)
                 store_seq_prob = copy.deepcopy(seq_prob).to(device)
